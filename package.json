@@ -1,0 +1,23 @@
+{
+  "name": "elm-serverless",
+  "version": "1.0.0",
+  "description": "A Serverless plugin for deploying Elm functions",
+  "main": ".serverless_plugins/elm.js",
+  "dependencies": {
+    "node-elm-compiler": "4.3.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hkgumbs/elm-serverless.git"
+  },
+  "author": "",
+  "license": "BSD-3-Clause",
+  "bugs": {
+    "url": "https://github.com/hkgumbs/elm-serverless/issues"
+  },
+  "homepage": "https://github.com/hkgumbs/elm-serverless#readme"
+}
