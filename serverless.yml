@@ -6,7 +6,7 @@ provider:
 
 functions:
   hello:
-    elm: ./src/Main.elm
+    elm: ./Main.elm
     module: Main
 
 plugins:
