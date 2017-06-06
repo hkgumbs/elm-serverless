@@ -33,9 +33,11 @@ const footer = (provider, mod) => {
   if (provider === 'aws')
     return lines(
       `module.exports.${runner} = function(event, context, callback) {`,
-      `  var arg = { event: event, context: context };`,
-      `  var resolve = function(data) { callback(null, data); };`,
-      `  module.exports.${mod}.${program}(arg).ports.done.subscribe(resolve);`,
+      `  try {`,
+      `    var arg = { event: event, context: context };`,
+      `    var resolve = function(data) { callback(null, data); };`,
+      `    module.exports.${mod}.${program}(arg).ports.done.subscribe(resolve);`,
+      `  } catch (e) { callback(e.message); };`,
       `};`
     );
 };

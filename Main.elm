@@ -28,7 +28,7 @@ update _ _ =
     )
 
 
-main : Platform.Program {} Model Msg
+main : Platform.Program { event : Int } Model Msg
 main =
     Platform.programWithFlags
         { init = init
