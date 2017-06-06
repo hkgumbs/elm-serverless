@@ -1,33 +1,58 @@
 const fs = require('fs');
+const path = require('path');
 const elm = require('node-elm-compiler');
 
-const output = 'handler.js';
-const flags = { yes: true, output: output };
+const runner = 'main';
+const program = 'worker';
+const flags = { yes: true, output: 'handler.js' };
 
-const handle = (serverless, options) => () => {
+const handle = (service, options) => () => {
+  const arg = options.function || options.f;
+  const targets = arg ? [arg] : find(service.functions);
+  return Promise.all(targets.map(compile(service)));
+};
+
+const compile = (service) => (target) => {
   return new Promise((resolve, reject) => {
-    const target = options.function || options.f;
-    const lambda = serverless.service.functions[target];
+    const lambda = service.functions[target];
+    const provider = service.provider.name;
 
-    lambda.handler = 'handler.serverless';
+    lambda.handler = path.basename(flags.output, '.js') + '.' + runner;
 
     return elm.compile(lambda.elm, flags)
-      .on('close', (exitCode) => exitCode === 0 ? success(resolve) : reject())
+      .on('close', (exitCode) => {
+        if (exitCode === 0)
+          fs.appendFile(flags.output, footer(provider, lambda.module), resolve);
+        else
+          reject();
+      });
   });
-}
+};
 
-const success = (resolve) => {
-  const footer = `
-    module.exports.serverless = module.exports.Main.serverless;
-  `;
+const footer = (provider, mod) => {
+  if (provider === 'aws')
+    return lines(
+      `module.exports.${runner} = function(event, context, callback) {`,
+      `  var arg = { event: event, context: context };`,
+      `  var resolve = function(data) { callback(null, data); };`,
+      `  module.exports.${mod}.${program}(arg).ports.done.subscribe(resolve);`,
+      `};`
+    );
+};
 
-  fs.appendFile(output, footer, resolve);
-}
+const find = (functions) => {
+  return Object.keys(functions).filter((key) => functions[key].elm);
+};
+
+const lines = (...strings) => strings.join('\n');
 
 class Elm {
   constructor(serverless, options) {
+    const action = handle(serverless.service, options);
+
     this.hooks = {
-      'before:deploy:createDeploymentArtifacts': handle(serverless, options),
+      'before:deploy:createDeploymentArtifacts': action,
+      'before:deploy:function:packageFunction': action,
     };
   }
 }
