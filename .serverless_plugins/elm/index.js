@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const elm = require('node-elm-compiler');
+const mustache = require('mustache');
 
 const runner = 'main';
 
@@ -16,7 +17,6 @@ const compile = (serverless) => (target) => {
     const lambda = serverless.service.functions[target],
           provider = serverless.service.provider.name,
           output = artifact(target),
-          content = footer(provider, lambda.elm),
           source = code(serverless.config.servicePath, lambda.elm);
 
     lambda.handler = output.handler;
@@ -24,8 +24,8 @@ const compile = (serverless) => (target) => {
     return elm.compile(source, { yes: true, output: output.js })
       .on('close', (exitCode) => {
         if (exitCode === 0)
-          fs.appendFile(output.js, content, (err) => {
-            err ? reject() : resolve()
+          footer(provider, output.js, lambda.elm, (err) => {
+            err ? reject() : resolve();
           });
         else
           reject();
@@ -42,17 +42,12 @@ const code = (context, mod) => {
     .find(fs.existsSync);
 };
 
-const footer = (provider, mod) => {
-  if (provider === 'aws')
-    return lines(
-      `module.exports.${runner} = function(event, context, callback) {`,
-      `  try {`,
-      `    var arg = { event: event, context: context };`,
-      `    var resolve = function(data) { callback(null, data); };`,
-      `    module.exports.${mod}.worker(arg).ports.done.subscribe(resolve);`,
-      `  } catch (e) { callback(e.message); }`,
-      `};`
-    );
+const footer = (provider, js, mod, callback) => {
+  const template = path.join(__dirname, provider + '.mst');
+  fs.readFile(template, 'utf8', (_, data) => {
+    const rendered = mustache.render(data, { runner: runner, module: mod });
+    fs.appendFile(js, rendered, callback);
+  });
 };
 
 const find = (arg, fs) => {
@@ -72,8 +67,6 @@ const artifact = (target) => {
     handler: base + '.' + runner
   };
 };
-
-const lines = (...strings) => strings.join('\n');
 
 class Elm {
   constructor(serverless, options) {

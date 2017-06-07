@@ -1,0 +1,9 @@
+module.exports.{{runner}} = function(event, context, callback) {
+  try {
+    var arg = { event: event, context: context };
+    var resolve = function(data) { callback(null, data); };
+    module.exports.{{module}}.worker(arg).ports.done.subscribe(resolve);
+  } catch (e) {
+    callback(e.message);
+  }
+};

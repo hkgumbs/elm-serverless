@@ -6,7 +6,9 @@
   "dependencies": {
     "node-elm-compiler": "4.3.1"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "mustache": "^2.3.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
