@@ -3,30 +3,43 @@ const path = require('path');
 const elm = require('node-elm-compiler');
 
 const runner = 'main';
-const program = 'worker';
-const flags = { yes: true, output: 'handler.js' };
 
-const handle = (service, options) => () => {
-  const arg = options.function || options.f;
-  const targets = arg ? [arg] : find(service.functions);
-  return Promise.all(targets.map(compile(service)));
+const run = (serverless, options) => () => {
+  const arg = options.function || options.f,
+        targets = find(arg, serverless.service.functions);
+
+  return Promise.all(targets.map(compile(serverless)));
 };
 
-const compile = (service) => (target) => {
+const compile = (serverless) => (target) => {
   return new Promise((resolve, reject) => {
-    const lambda = service.functions[target];
-    const provider = service.provider.name;
+    const lambda = serverless.service.functions[target],
+          provider = serverless.service.provider.name,
+          output = artifact(target),
+          content = footer(provider, lambda.elm),
+          source = code(serverless.config.servicePath, lambda.elm);
 
-    lambda.handler = path.basename(flags.output, '.js') + '.' + runner;
+    lambda.handler = output.handler;
 
-    return elm.compile(lambda.elm, flags)
+    return elm.compile(source, { yes: true, output: output.js })
       .on('close', (exitCode) => {
         if (exitCode === 0)
-          fs.appendFile(flags.output, footer(provider, lambda.module), resolve);
+          fs.appendFile(output.js, content, (err) => {
+            err ? reject() : resolve()
+          });
         else
           reject();
       });
   });
+};
+
+const code = (context, mod) => {
+  const manifest = require(path.join(context, 'elm-package.json')),
+        relative = mod.replace('.', path.sep) + '.elm';
+
+  return manifest['source-directories']
+    .map((dir) => path.join(dir, relative))
+    .find(fs.existsSync);
 };
 
 const footer = (provider, mod) => {
@@ -36,21 +49,35 @@ const footer = (provider, mod) => {
       `  try {`,
       `    var arg = { event: event, context: context };`,
       `    var resolve = function(data) { callback(null, data); };`,
-      `    module.exports.${mod}.${program}(arg).ports.done.subscribe(resolve);`,
-      `  } catch (e) { callback(e.message); };`,
+      `    module.exports.${mod}.worker(arg).ports.done.subscribe(resolve);`,
+      `  } catch (e) { callback(e.message); }`,
       `};`
     );
 };
 
-const find = (functions) => {
-  return Object.keys(functions).filter((key) => functions[key].elm);
+const find = (arg, fs) => {
+  if (arg == null)
+    return Object.keys(fs).filter((key) => fs[key].elm);
+  else if (Array.isArray(arg))
+    return arg;
+  else
+    return [arg];
+};
+
+const artifact = (target) => {
+  const base = path.join('elm-stuff', 'serverless', target);
+
+  return {
+    js: base + '.js',
+    handler: base + '.' + runner
+  };
 };
 
 const lines = (...strings) => strings.join('\n');
 
 class Elm {
   constructor(serverless, options) {
-    const action = handle(serverless.service, options);
+    const action = run(serverless, options);
 
     this.hooks = {
       'before:deploy:createDeploymentArtifacts': action,

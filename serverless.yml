@@ -6,8 +6,10 @@ provider:
 
 functions:
   hello:
-    elm: ./Example.elm
-    module: Main
+    elm: Hello
+
+  goodbye:
+    elm: Nested.Broken
 
 plugins:
   - elm
